@@ -84,22 +84,14 @@ def save_cursor(response_id: str):
 
 
 def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
-    """
-    Busca respostas do Typeform.
-    after_token: response_id da última resposta já processada (cursor).
-                 Typeform retorna apenas respostas DEPOIS desse token.
-    """
     if not TOKEN:
         raise RuntimeError("Defina TYPEFORM_TOKEN no .env")
     if not FORM_ID:
         raise RuntimeError("Defina TYPEFORM_FORM_ID no .env")
 
-    params = {
-        "page_size": min(page_size, 1000),
-    }
+    params = {"page_size": min(page_size, 1000)}
 
-    # A API do Typeform rejeita 'sort' e 'after' juntos.
-    # O 'after' já garante a ordenação cronológica a partir do cursor.
+    # O Typeform rejeita 'sort' e 'after' juntos.
     if after_token:
         params["after"] = after_token
     else:
@@ -112,13 +104,80 @@ def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
         timeout=30,
     )
     if resp.status_code == 401:
-        raise RuntimeError(
-            "TYPEFORM_TOKEN inválido ou expirado (401). "
-            "Gere um novo token em https://admin.typeform.com/account#/section/tokens "
-            "e atualize o secret TYPEFORM_TOKEN no repositório."
-        )
+        raise RuntimeError("TYPEFORM_TOKEN inválido ou expirado (401).")
     resp.raise_for_status()
     return resp.json()
+
+
+def ingest(max_responses: int = 100, reset_cursor: bool = False):
+    after = None if reset_cursor else load_cursor()
+
+    if reset_cursor:
+        print("Cursor resetado — reingerindo todas as respostas.")
+    elif after:
+        print(f"Buscando respostas após o token: {after}")
+    else:
+        print("Primeira execução — buscando todas as respostas disponíveis.")
+
+    # Trata cursor que caducou/foi apagado no Typeform
+    try:
+        data = fetch_responses(after_token=after, page_size=max_responses)
+    except requests.exceptions.HTTPError as err:
+        if err.response is not None and err.response.status_code == 400 and after:
+            print("AVISO: Cursor antigo expirou. Reiniciando a busca do início...")
+            data = fetch_responses(after_token=None, page_size=max_responses)
+        else:
+            raise err
+
+    items = data.get("items", [])
+    total = data.get("total_items", len(items))
+
+    if not items:
+        print("Nenhuma resposta nova encontrada.")
+        return
+
+    print(f"{len(items)} resposta(s) encontrada(s) (total no form: {total})")
+
+    ingested = 0
+    last_token = None
+
+    for item in items:
+        try:
+            response_id = item.get("response_id", str(uuid.uuid4()))
+            submitted_at = item.get("submitted_at", datetime.now(timezone.utc).isoformat())
+            answers = item.get("answers", [])
+
+            nome = get_answer(answers, FIELD_NOME)
+            email = get_answer(answers, FIELD_EMAIL)
+            assunto = get_answer(answers, FIELD_ASSUNTO)
+            mensagem = get_answer(answers, FIELD_MENSAGEM)
+
+            text = f"{assunto}: {mensagem}".strip() if mensagem else assunto
+
+            row = {
+                "id": f"form-{response_id}",
+                "channel": "formulario",
+                "from": f"{nome} <{email}>" if email else nome,
+                "to": "",
+                "subject": assunto,
+                "text": text,
+                "received_at": submitted_at,
+                "message_id": email,
+            }
+
+            fname = STAGING / f"form-{response_id}.csv"
+            pd.DataFrame([row]).to_csv(fname, index=False, encoding="utf-8")
+            ingested += 1
+            last_token = response_id
+
+        except Exception as e:
+            print(f"Erro na resposta {item.get('response_id', '?')}: {e}")
+            continue
+
+    if last_token:
+        save_cursor(last_token)
+
+    print(f"Ingestão concluída: {ingested} resposta(s) salvas em {STAGING}")
 
 
 # def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:

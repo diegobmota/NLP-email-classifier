@@ -10,16 +10,27 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      env:
       TYPEFORM_TOKEN:     ${{ secrets.TYPEFORM_TOKEN }}
       TYPEFORM_FORM_ID:   ${{ secrets.TYPEFORM_FORM_ID }}
       FIELD_NOME:         ${{ secrets.FIELD_NOME }}
       FIELD_EMAIL:        ${{ secrets.FIELD_EMAIL }}
       FIELD_ASSUNTO:      ${{ secrets.FIELD_ASSUNTO }}
       FIELD_MENSAGEM:     ${{ secrets.FIELD_MENSAGEM }}
-      OPENAI_API_KEY:     ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL:       ${{ secrets.OPENAI_MODEL }}
+      OPENAI_API_KEY:     ${{ secrets.LLM_API_KEY }}
+      OPENAI_MODEL:       "gpt-4o-mini"
       SLACK_BOT_TOKEN:    ${{ secrets.SLACK_BOT_TOKEN }}
       SLACK_CHANNEL_ID:   ${{ secrets.SLACK_CHANNEL_ID }}
+      # TYPEFORM_TOKEN:     ${{ secrets.TYPEFORM_TOKEN }}
+      # TYPEFORM_FORM_ID:   ${{ secrets.TYPEFORM_FORM_ID }}
+      # FIELD_NOME:         ${{ secrets.FIELD_NOME }}
+      # FIELD_EMAIL:        ${{ secrets.FIELD_EMAIL }}
+      # FIELD_ASSUNTO:      ${{ secrets.FIELD_ASSUNTO }}
+      # FIELD_MENSAGEM:     ${{ secrets.FIELD_MENSAGEM }}
+      # OPENAI_API_KEY:     ${{ secrets.OPENAI_API_KEY }}
+      # OPENAI_MODEL:       ${{ secrets.OPENAI_MODEL }}
+      # SLACK_BOT_TOKEN:    ${{ secrets.SLACK_BOT_TOKEN }}
+      # SLACK_CHANNEL_ID:   ${{ secrets.SLACK_CHANNEL_ID }}
 
     steps:
       - name: Checkout
