@@ -167,7 +167,16 @@ def ingest(max_responses: int = 100, reset_cursor: bool = False):
     else:
         print("Primeira execução — buscando todas as respostas disponíveis.")
 
-    data  = fetch_responses(after_token=after, page_size=max_responses)
+    # Tenta buscar usando o cursor. Se der HTTP 400 (cursor expirado/inválido), força o fallback.
+    try:
+        data = fetch_responses(after_token=after, page_size=max_responses)
+    except requests.exceptions.HTTPError as err:
+        if err.response is not None and err.response.status_code == 400 and after:
+            print("AVISO: O cursor atual é inválido ou expirou no Typeform. Reiniciando a busca sem cursor...")
+            data = fetch_responses(after_token=None, page_size=max_responses)
+        else:
+            raise err
+
     items = data.get("items", [])
     total = data.get("total_items", len(items))
 
@@ -177,47 +186,108 @@ def ingest(max_responses: int = 100, reset_cursor: bool = False):
 
     print(f"{len(items)} resposta(s) encontrada(s) (total no form: {total})")
 
-    ingested       = 0
-    last_token     = None
+    ingested = 0
+    last_token = None
 
     for item in items:
         try:
-            response_id  = item.get("response_id", str(uuid.uuid4()))
+            response_id = item.get("response_id", str(uuid.uuid4()))
             submitted_at = item.get("submitted_at", datetime.now(timezone.utc).isoformat())
-            answers      = item.get("answers", [])
+            answers = item.get("answers", [])
 
-            nome     = get_answer(answers, FIELD_NOME)
-            email    = get_answer(answers, FIELD_EMAIL)
-            assunto  = get_answer(answers, FIELD_ASSUNTO)
+            nome = get_answer(answers, FIELD_NOME)
+            email = get_answer(answers, FIELD_EMAIL)
+            assunto = get_answer(answers, FIELD_ASSUNTO)
             mensagem = get_answer(answers, FIELD_MENSAGEM)
 
-            # texto principal para o NLP — junta assunto + mensagem
             text = f"{assunto}: {mensagem}".strip() if mensagem else assunto
 
             row = {
-                "id":          f"form-{response_id}",
-                "channel":     "formulario",
-                "from":        f"{nome} <{email}>" if email else nome,
-                "to":          "",
-                "subject":     assunto,
-                "text":        text,
+                "id": f"form-{response_id}",
+                "channel": "formulario",
+                "from": f"{nome} <{email}>" if email else nome,
+                "to": "",
+                "subject": assunto,
+                "text": text,
                 "received_at": submitted_at,
-                "message_id":  email,         # email fica em message_id
+                "message_id": email,
             }
 
             fname = STAGING / f"form-{response_id}.csv"
             pd.DataFrame([row]).to_csv(fname, index=False, encoding="utf-8")
-            ingested  += 1
+            ingested += 1
             last_token = response_id
 
         except Exception as e:
-            print(f"  Erro na resposta {item.get('response_id', '?')}: {e}")
+            print(f" Erro na resposta {item.get('response_id', '?')}: {e}")
             continue
 
     if last_token:
         save_cursor(last_token)
 
     print(f"Ingestão concluída: {ingested} resposta(s) salvas em {STAGING}")
+
+# def ingest(max_responses: int = 100, reset_cursor: bool = False):
+#     after = None if reset_cursor else load_cursor()
+
+#     if reset_cursor:
+#         print("Cursor resetado — reingerindo todas as respostas.")
+#     elif after:
+#         print(f"Buscando respostas após o token: {after}")
+#     else:
+#         print("Primeira execução — buscando todas as respostas disponíveis.")
+
+#     data  = fetch_responses(after_token=after, page_size=max_responses)
+#     items = data.get("items", [])
+#     total = data.get("total_items", len(items))
+
+#     if not items:
+#         print("Nenhuma resposta nova encontrada.")
+#         return
+
+#     print(f"{len(items)} resposta(s) encontrada(s) (total no form: {total})")
+
+#     ingested       = 0
+#     last_token     = None
+
+#     for item in items:
+#         try:
+#             response_id  = item.get("response_id", str(uuid.uuid4()))
+#             submitted_at = item.get("submitted_at", datetime.now(timezone.utc).isoformat())
+#             answers      = item.get("answers", [])
+
+#             nome     = get_answer(answers, FIELD_NOME)
+#             email    = get_answer(answers, FIELD_EMAIL)
+#             assunto  = get_answer(answers, FIELD_ASSUNTO)
+#             mensagem = get_answer(answers, FIELD_MENSAGEM)
+
+#             # texto principal para o NLP — junta assunto + mensagem
+#             text = f"{assunto}: {mensagem}".strip() if mensagem else assunto
+
+#             row = {
+#                 "id":          f"form-{response_id}",
+#                 "channel":     "formulario",
+#                 "from":        f"{nome} <{email}>" if email else nome,
+#                 "to":          "",
+#                 "subject":     assunto,
+#                 "text":        text,
+#                 "received_at": submitted_at,
+#                 "message_id":  email,         # email fica em message_id
+#             }
+
+#             fname = STAGING / f"form-{response_id}.csv"
+#             pd.DataFrame([row]).to_csv(fname, index=False, encoding="utf-8")
+#             ingested  += 1
+#             last_token = response_id
+
+#         except Exception as e:
+#             print(f"  Erro na resposta {item.get('response_id', '?')}: {e}")
+#             continue
+
+#     if last_token:
+#         save_cursor(last_token)
+
+#     print(f"Ingestão concluída: {ingested} resposta(s) salvas em {STAGING}")
 
 
 # --- CLI ---
