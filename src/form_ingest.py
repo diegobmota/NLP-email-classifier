@@ -96,10 +96,14 @@ def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
 
     params = {
         "page_size": min(page_size, 1000),
-        "sort": "submitted_at,asc",
     }
+
+    # A API do Typeform rejeita 'sort' e 'after' juntos.
+    # O 'after' já garante a ordenação cronológica a partir do cursor.
     if after_token:
         params["after"] = after_token
+    else:
+        params["sort"] = "submitted_at,asc"
 
     resp = requests.get(
         f"{BASE_URL}/forms/{FORM_ID}/responses",
@@ -115,6 +119,40 @@ def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
         )
     resp.raise_for_status()
     return resp.json()
+
+
+# def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
+#     """
+#     Busca respostas do Typeform.
+#     after_token: response_id da última resposta já processada (cursor).
+#                  Typeform retorna apenas respostas DEPOIS desse token.
+#     """
+#     if not TOKEN:
+#         raise RuntimeError("Defina TYPEFORM_TOKEN no .env")
+#     if not FORM_ID:
+#         raise RuntimeError("Defina TYPEFORM_FORM_ID no .env")
+
+#     params = {
+#         "page_size": min(page_size, 1000),
+#         "sort": "submitted_at,asc",
+#     }
+#     if after_token:
+#         params["after"] = after_token
+
+#     resp = requests.get(
+#         f"{BASE_URL}/forms/{FORM_ID}/responses",
+#         headers={"Authorization": f"Bearer {TOKEN}"},
+#         params=params,
+#         timeout=30,
+#     )
+#     if resp.status_code == 401:
+#         raise RuntimeError(
+#             "TYPEFORM_TOKEN inválido ou expirado (401). "
+#             "Gere um novo token em https://admin.typeform.com/account#/section/tokens "
+#             "e atualize o secret TYPEFORM_TOKEN no repositório."
+#         )
+#     resp.raise_for_status()
+#     return resp.json()
 
 
 # --- ingestão principal ---
