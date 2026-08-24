@@ -91,7 +91,7 @@ def fetch_responses(after_token: str = None, page_size: int = 100) -> dict:
 
     params = {"page_size": min(page_size, 1000)}
 
-    # O Typeform rejeita 'sort' e 'after' juntos.
+    # A API do Typeform NÃO aceita 'sort' e 'after' na mesma requisição
     if after_token:
         params["after"] = after_token
     else:
@@ -119,12 +119,12 @@ def ingest(max_responses: int = 100, reset_cursor: bool = False):
     else:
         print("Primeira execução — buscando todas as respostas disponíveis.")
 
-    # Trata cursor que caducou/foi apagado no Typeform
+    # Se o cursor der erro 400 por ter expirado na API, faz o fallback sem cursor
     try:
         data = fetch_responses(after_token=after, page_size=max_responses)
     except requests.exceptions.HTTPError as err:
         if err.response is not None and err.response.status_code == 400 and after:
-            print("AVISO: Cursor antigo expirou. Reiniciando a busca do início...")
+            print("AVISO: Cursor expirou ou é inválido. Reiniciando busca do início...")
             data = fetch_responses(after_token=None, page_size=max_responses)
         else:
             raise err
