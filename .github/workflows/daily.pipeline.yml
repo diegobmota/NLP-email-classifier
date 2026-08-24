@@ -73,7 +73,7 @@ jobs:
           echo "Acesso às respostas OK."
 
       - name: 1. Ingestão Typeform
-        run: python src/form_ingest.py
+        run: python src/form_ingest.py --reset-cursor
 
       - name: 2. Merge mensagens
         run: python src/merge_messages.py
