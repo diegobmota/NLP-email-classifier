@@ -84,7 +84,7 @@ jobs:
           echo "Acesso às respostas OK."
 
       - name: 1. Ingestão Typeform
-        run: python src/form_ingest.py --reset-cursor
+        run: python src/form_ingest.py
 
       - name: 2. Merge mensagens
         run: python src/merge_messages.py
@@ -105,4 +105,4 @@ jobs:
         run: python src/llm_generate_replies.py
 
       - name: 8. Envio ao Slack
-        run: python src/send_to_slack_bot.py
+        run: python src/send_to_slack_bot.py --limit 5 ##para enviar somente 5 mensagens por hora
