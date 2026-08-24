@@ -27,6 +27,6 @@ pytest>=7.2
 openai>=1.0
 
 # spaCy model
-pt-core-news-sm
+##pt-core-news-sm
 
 ##INSTALAR MANULA VIA PYTHON python -m spacy download pt_core_news_sm CASO CONTRÁRIO O CÓDIGO NÃO IRA RODAR
