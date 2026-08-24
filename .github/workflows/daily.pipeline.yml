@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Download spaCy model
+      - name: Install spaCy Portuguese model
         run: python -m spacy download pt_core_news_sm
 
       - name: Create data directories
